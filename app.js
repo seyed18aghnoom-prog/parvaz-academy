@@ -1,49 +1,61 @@
-/* اتصال به Firebase */
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_BUCKET",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+// اتصال به Supabase
+const supabaseUrl = "https://zqvcywavtqbaqfdhtflu.supabase.co";
+const supabaseKey = "sb_publishable_6KS4Ids_vE1vmWq_f8Pigw_ZxMYwVq3";
+const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
 /* ثبت‌نام */
-function register() {
+async function register() {
   const name = document.getElementById("name").value;
   const national = document.getElementById("national").value;
   const phone = document.getElementById("phone").value;
   const password = document.getElementById("password").value;
 
-  auth.createUserWithEmailAndPassword(phone + "@parvaz.com", password)
-    .then(user => {
-      db.collection("students").doc(user.user.uid).set({
-        name: name,
-        national: national,
-        phone: phone
-      });
-      alert("ثبت‌نام با موفقیت انجام شد");
-    })
-    .catch(err => alert(err.message));
+  // ساخت کاربر
+  const { data: user, error } = await supabase.auth.signUp({
+    email: phone + "@parvaz.com",
+    password: password
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  // ذخیره اطلاعات در جدول
+  await supabase.from("students").insert({
+    name: name,
+    national: national,
+    phone: phone,
+    user_id: user.user.id
+  });
+
+  alert("ثبت‌نام با موفقیت انجام شد");
 }
 
 /* ورود */
-function login() {
+async function login() {
   const phone = document.getElementById("loginPhone").value;
   const password = document.getElementById("loginPass").value;
 
-  auth.signInWithEmailAndPassword(phone + "@parvaz.com", password)
-    .then(user => {
-      db.collection("students").doc(user.user.uid).get().then(doc => {
-        document.getElementById("profile").innerHTML =
-          "نام: " + doc.data().name + "<br>" +
-          "کد ملی: " + doc.data().national + "<br>" +
-          "شماره همراه: " + doc.data().phone;
-      });
-    })
-    .catch(err => alert(err.message));
+  const { data: user, error } = await supabase.auth.signInWithPassword({
+    email: phone + "@parvaz.com",
+    password: password
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  // دریافت اطلاعات پروفایل
+  const { data: profile } = await supabase
+    .from("students")
+    .select("*")
+    .eq("user_id", user.user.id)
+    .single();
+
+  document.getElementById("profile").innerHTML =
+    "نام: " + profile.name + "<br>" +
+    "کد ملی: " + profile.national + "<br>" +
+    "شماره همراه: " + profile.phone;
 }
